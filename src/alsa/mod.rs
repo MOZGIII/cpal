@@ -412,6 +412,7 @@ impl EventLoop {
         unsafe {
             let mut run_context = self.run_context.lock().unwrap();
             let run_context = &mut *run_context;
+            let alsa_read_mutex = Mutex::new(());
 
             loop {
                 {
@@ -550,11 +551,14 @@ impl EventLoop {
                                     let mut buffer: Vec<$T> = iter::repeat(mem::uninitialized())
                                         .take(available)
                                         .collect();
-                                    let err = alsa::snd_pcm_readi(
-                                        stream_inner.channel,
-                                        buffer.as_mut_ptr() as *mut _,
-                                        available as _,
-                                    );
+                                    let err = {
+                                        let _lock = alsa_read_mutex.lock();
+                                        alsa::snd_pcm_readi(
+                                            stream_inner.channel,
+                                            buffer.as_mut_ptr() as *mut _,
+                                            available as _,
+                                        )
+                                    };
                                     check_errors(err as _).expect("snd_pcm_readi error");
                                     let input_buffer = InputBuffer {
                                         buffer: &buffer,
